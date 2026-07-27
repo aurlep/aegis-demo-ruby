@@ -1,0 +1,51 @@
+name: DAST (ZAP baseline)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  dast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t demo-app:ci .
+
+      - name: Start app
+        run: |
+          docker run -d --rm --name demo-app -p 4567:4567 demo-app:ci
+          for i in {1..60}; do
+            if curl -fs "http://localhost:4567/healthz" >/dev/null 2>&1; then
+              echo "app is up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "app did not become ready"
+          docker logs demo-app || true
+          exit 1
+
+      - name: ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: 'http://localhost:4567'
+          fail_action: false
+          allow_issue_writing: false
+          cmd_options: '-a -j -T 5'
+          artifact_name: 'zap-report-ruby'
+
+      - name: Show app logs (on failure)
+        if: failure()
+        run: docker logs demo-app || true
+
+      - name: Stop app
+        if: always()
+        run: docker stop demo-app || true

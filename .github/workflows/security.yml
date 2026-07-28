@@ -30,10 +30,26 @@ jobs:
           --exit-code 0 .
       - name: Send findings to Aegis
         if: always()
-        run: 'curl -sf -X POST "$AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=trivy"
-          -H "Authorization: Aegis-CI $AEGIS_INGEST_TOKEN" -H "X-Aegis-Organization:
-          7b5b6e10-f2c2-4e6e-83fb-41c999b01d47" -H "Content-Type: application/json"
-          --data-binary @results.sarif || echo ''Aegis ingest skipped (unreachable)'''
+        run: "report=\"results.sarif\"\nif [ ! -s \"$report\" ]; then\n  echo \"::warning\
+          \ title=Aegis ingest skipped::trivy: $report is missing or empty - nothing\
+          \ to send\"\n  echo \"- \\`trivy\\`: no report produced\" >> \"$GITHUB_STEP_SUMMARY\"\
+          \n  exit 0\nfi\nif command -v curl >/dev/null 2>&1; then\n  code=$(curl\
+          \ -sS -o aegis-response.json -w '%{http_code}' --max-time 60 -X POST \"\
+          $AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=trivy\"\
+          \ -H \"Authorization: Aegis-CI $AEGIS_INGEST_TOKEN\" -H \"X-Aegis-Organization:\
+          \ 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\" -H \"Content-Type: application/json\"\
+          \ --data-binary @\"$report\") || code=000\nelif command -v wget >/dev/null\
+          \ 2>&1; then\n  if wget -q -O aegis-response.json --header=\"Authorization:\
+          \ Aegis-CI $AEGIS_INGEST_TOKEN\" --header=\"X-Aegis-Organization: 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\"\
+          \ --header=\"Content-Type: application/json\" --post-file=\"$report\" \"\
+          $AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=trivy\"\
+          ; then code=202; else code=wget-failed; fi\nelse\n  code=no-http-client\n\
+          fi\nif [ \"$code\" = \"202\" ]; then\n  echo \"- \\`trivy\\`: accepted by\
+          \ Aegis\" >> \"$GITHUB_STEP_SUMMARY\"\nelse\n  echo \"::warning title=Aegis\
+          \ ingest failed::trivy: $code - these findings did not reach the hub\"\n\
+          \  echo \"- \\`trivy\\`: **not** sent to Aegis ($code)\" >> \"$GITHUB_STEP_SUMMARY\"\
+          \n  head -c 500 aegis-response.json >> \"$GITHUB_STEP_SUMMARY\" 2>/dev/null\
+          \ || true\nfi"
         env:
           AEGIS_URL: ${{ secrets.AEGIS_URL }}
           AEGIS_INGEST_TOKEN: ${{ secrets.AEGIS_INGEST_TOKEN }}
@@ -55,14 +71,30 @@ jobs:
         uses: bridgecrewio/checkov-action@7b972723c44fb3d256283fac96fae5d7c1894bb7  # v12
         with:
           output_format: sarif
-          output_file_path: results.sarif
+          output_file_path: checkov-report
           soft_fail: true
       - name: Send findings to Aegis
         if: always()
-        run: 'curl -sf -X POST "$AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=checkov"
-          -H "Authorization: Aegis-CI $AEGIS_INGEST_TOKEN" -H "X-Aegis-Organization:
-          7b5b6e10-f2c2-4e6e-83fb-41c999b01d47" -H "Content-Type: application/json"
-          --data-binary @results.sarif || echo ''Aegis ingest skipped (unreachable)'''
+        run: "report=\"checkov-report/results_sarif.sarif\"\nif [ ! -s \"$report\"\
+          \ ]; then\n  echo \"::warning title=Aegis ingest skipped::checkov: $report\
+          \ is missing or empty - nothing to send\"\n  echo \"- \\`checkov\\`: no\
+          \ report produced\" >> \"$GITHUB_STEP_SUMMARY\"\n  exit 0\nfi\nif command\
+          \ -v curl >/dev/null 2>&1; then\n  code=$(curl -sS -o aegis-response.json\
+          \ -w '%{http_code}' --max-time 60 -X POST \"$AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=checkov\"\
+          \ -H \"Authorization: Aegis-CI $AEGIS_INGEST_TOKEN\" -H \"X-Aegis-Organization:\
+          \ 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\" -H \"Content-Type: application/json\"\
+          \ --data-binary @\"$report\") || code=000\nelif command -v wget >/dev/null\
+          \ 2>&1; then\n  if wget -q -O aegis-response.json --header=\"Authorization:\
+          \ Aegis-CI $AEGIS_INGEST_TOKEN\" --header=\"X-Aegis-Organization: 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\"\
+          \ --header=\"Content-Type: application/json\" --post-file=\"$report\" \"\
+          $AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=checkov\"\
+          ; then code=202; else code=wget-failed; fi\nelse\n  code=no-http-client\n\
+          fi\nif [ \"$code\" = \"202\" ]; then\n  echo \"- \\`checkov\\`: accepted\
+          \ by Aegis\" >> \"$GITHUB_STEP_SUMMARY\"\nelse\n  echo \"::warning title=Aegis\
+          \ ingest failed::checkov: $code - these findings did not reach the hub\"\
+          \n  echo \"- \\`checkov\\`: **not** sent to Aegis ($code)\" >> \"$GITHUB_STEP_SUMMARY\"\
+          \n  head -c 500 aegis-response.json >> \"$GITHUB_STEP_SUMMARY\" 2>/dev/null\
+          \ || true\nfi"
         env:
           AEGIS_URL: ${{ secrets.AEGIS_URL }}
           AEGIS_INGEST_TOKEN: ${{ secrets.AEGIS_INGEST_TOKEN }}
@@ -71,7 +103,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: checkov-report
-          path: results.sarif
+          path: checkov-report/results_sarif.sarif
   hadolint:
     name: Container (Hadolint)
     runs-on: ubuntu-latest
@@ -89,10 +121,26 @@ jobs:
           no-fail: true
       - name: Send findings to Aegis
         if: always()
-        run: 'curl -sf -X POST "$AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=hadolint"
-          -H "Authorization: Aegis-CI $AEGIS_INGEST_TOKEN" -H "X-Aegis-Organization:
-          7b5b6e10-f2c2-4e6e-83fb-41c999b01d47" -H "Content-Type: application/json"
-          --data-binary @results.sarif || echo ''Aegis ingest skipped (unreachable)'''
+        run: "report=\"results.sarif\"\nif [ ! -s \"$report\" ]; then\n  echo \"::warning\
+          \ title=Aegis ingest skipped::hadolint: $report is missing or empty - nothing\
+          \ to send\"\n  echo \"- \\`hadolint\\`: no report produced\" >> \"$GITHUB_STEP_SUMMARY\"\
+          \n  exit 0\nfi\nif command -v curl >/dev/null 2>&1; then\n  code=$(curl\
+          \ -sS -o aegis-response.json -w '%{http_code}' --max-time 60 -X POST \"\
+          $AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=hadolint\"\
+          \ -H \"Authorization: Aegis-CI $AEGIS_INGEST_TOKEN\" -H \"X-Aegis-Organization:\
+          \ 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\" -H \"Content-Type: application/json\"\
+          \ --data-binary @\"$report\") || code=000\nelif command -v wget >/dev/null\
+          \ 2>&1; then\n  if wget -q -O aegis-response.json --header=\"Authorization:\
+          \ Aegis-CI $AEGIS_INGEST_TOKEN\" --header=\"X-Aegis-Organization: 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\"\
+          \ --header=\"Content-Type: application/json\" --post-file=\"$report\" \"\
+          $AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=hadolint\"\
+          ; then code=202; else code=wget-failed; fi\nelse\n  code=no-http-client\n\
+          fi\nif [ \"$code\" = \"202\" ]; then\n  echo \"- \\`hadolint\\`: accepted\
+          \ by Aegis\" >> \"$GITHUB_STEP_SUMMARY\"\nelse\n  echo \"::warning title=Aegis\
+          \ ingest failed::hadolint: $code - these findings did not reach the hub\"\
+          \n  echo \"- \\`hadolint\\`: **not** sent to Aegis ($code)\" >> \"$GITHUB_STEP_SUMMARY\"\
+          \n  head -c 500 aegis-response.json >> \"$GITHUB_STEP_SUMMARY\" 2>/dev/null\
+          \ || true\nfi"
         env:
           AEGIS_URL: ${{ secrets.AEGIS_URL }}
           AEGIS_INGEST_TOKEN: ${{ secrets.AEGIS_INGEST_TOKEN }}
@@ -116,10 +164,26 @@ jobs:
           --exit-code 0 --no-banner
       - name: Send findings to Aegis
         if: always()
-        run: 'curl -sf -X POST "$AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=gitleaks"
-          -H "Authorization: Aegis-CI $AEGIS_INGEST_TOKEN" -H "X-Aegis-Organization:
-          7b5b6e10-f2c2-4e6e-83fb-41c999b01d47" -H "Content-Type: application/json"
-          --data-binary @results.sarif || echo ''Aegis ingest skipped (unreachable)'''
+        run: "report=\"results.sarif\"\nif [ ! -s \"$report\" ]; then\n  echo \"::warning\
+          \ title=Aegis ingest skipped::gitleaks: $report is missing or empty - nothing\
+          \ to send\"\n  echo \"- \\`gitleaks\\`: no report produced\" >> \"$GITHUB_STEP_SUMMARY\"\
+          \n  exit 0\nfi\nif command -v curl >/dev/null 2>&1; then\n  code=$(curl\
+          \ -sS -o aegis-response.json -w '%{http_code}' --max-time 60 -X POST \"\
+          $AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=gitleaks\"\
+          \ -H \"Authorization: Aegis-CI $AEGIS_INGEST_TOKEN\" -H \"X-Aegis-Organization:\
+          \ 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\" -H \"Content-Type: application/json\"\
+          \ --data-binary @\"$report\") || code=000\nelif command -v wget >/dev/null\
+          \ 2>&1; then\n  if wget -q -O aegis-response.json --header=\"Authorization:\
+          \ Aegis-CI $AEGIS_INGEST_TOKEN\" --header=\"X-Aegis-Organization: 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\"\
+          \ --header=\"Content-Type: application/json\" --post-file=\"$report\" \"\
+          $AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=gitleaks\"\
+          ; then code=202; else code=wget-failed; fi\nelse\n  code=no-http-client\n\
+          fi\nif [ \"$code\" = \"202\" ]; then\n  echo \"- \\`gitleaks\\`: accepted\
+          \ by Aegis\" >> \"$GITHUB_STEP_SUMMARY\"\nelse\n  echo \"::warning title=Aegis\
+          \ ingest failed::gitleaks: $code - these findings did not reach the hub\"\
+          \n  echo \"- \\`gitleaks\\`: **not** sent to Aegis ($code)\" >> \"$GITHUB_STEP_SUMMARY\"\
+          \n  head -c 500 aegis-response.json >> \"$GITHUB_STEP_SUMMARY\" 2>/dev/null\
+          \ || true\nfi"
         env:
           AEGIS_URL: ${{ secrets.AEGIS_URL }}
           AEGIS_INGEST_TOKEN: ${{ secrets.AEGIS_INGEST_TOKEN }}
@@ -145,10 +209,26 @@ jobs:
           SEMGREP_SEND_METRICS: 'off'
       - name: Send findings to Aegis
         if: always()
-        run: 'curl -sf -X POST "$AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=semgrep"
-          -H "Authorization: Aegis-CI $AEGIS_INGEST_TOKEN" -H "X-Aegis-Organization:
-          7b5b6e10-f2c2-4e6e-83fb-41c999b01d47" -H "Content-Type: application/json"
-          --data-binary @results.sarif || echo ''Aegis ingest skipped (unreachable)'''
+        run: "report=\"results.sarif\"\nif [ ! -s \"$report\" ]; then\n  echo \"::warning\
+          \ title=Aegis ingest skipped::semgrep: $report is missing or empty - nothing\
+          \ to send\"\n  echo \"- \\`semgrep\\`: no report produced\" >> \"$GITHUB_STEP_SUMMARY\"\
+          \n  exit 0\nfi\nif command -v curl >/dev/null 2>&1; then\n  code=$(curl\
+          \ -sS -o aegis-response.json -w '%{http_code}' --max-time 60 -X POST \"\
+          $AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=semgrep\"\
+          \ -H \"Authorization: Aegis-CI $AEGIS_INGEST_TOKEN\" -H \"X-Aegis-Organization:\
+          \ 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\" -H \"Content-Type: application/json\"\
+          \ --data-binary @\"$report\") || code=000\nelif command -v wget >/dev/null\
+          \ 2>&1; then\n  if wget -q -O aegis-response.json --header=\"Authorization:\
+          \ Aegis-CI $AEGIS_INGEST_TOKEN\" --header=\"X-Aegis-Organization: 7b5b6e10-f2c2-4e6e-83fb-41c999b01d47\"\
+          \ --header=\"Content-Type: application/json\" --post-file=\"$report\" \"\
+          $AEGIS_URL/api/v1/repositories/f6e114ee-d63a-4e10-8138-46a47de1b31c/findings:ingest?scanner=semgrep\"\
+          ; then code=202; else code=wget-failed; fi\nelse\n  code=no-http-client\n\
+          fi\nif [ \"$code\" = \"202\" ]; then\n  echo \"- \\`semgrep\\`: accepted\
+          \ by Aegis\" >> \"$GITHUB_STEP_SUMMARY\"\nelse\n  echo \"::warning title=Aegis\
+          \ ingest failed::semgrep: $code - these findings did not reach the hub\"\
+          \n  echo \"- \\`semgrep\\`: **not** sent to Aegis ($code)\" >> \"$GITHUB_STEP_SUMMARY\"\
+          \n  head -c 500 aegis-response.json >> \"$GITHUB_STEP_SUMMARY\" 2>/dev/null\
+          \ || true\nfi"
         env:
           AEGIS_URL: ${{ secrets.AEGIS_URL }}
           AEGIS_INGEST_TOKEN: ${{ secrets.AEGIS_INGEST_TOKEN }}

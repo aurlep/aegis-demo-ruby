@@ -1,4 +1,4 @@
-name: DAST (ZAP baseline)
+﻿name: DAST (ZAP baseline)
 
 on:
   workflow_dispatch:
@@ -39,9 +39,16 @@ jobs:
           target: 'http://localhost:4567'
           fail_action: false
           allow_issue_writing: false
-          cmd_options: '-a -j -T 5'
+          cmd_options: '-a -j -T 5 -J zap-report.json'
           artifact_name: 'zap-report-ruby'
 
+      - name: Send DAST findings to Aegis
+        if: always()
+        env:
+          AEGIS_URL: ${{ secrets.AEGIS_URL }}
+          AEGIS_INGEST_TOKEN: ${{ secrets.AEGIS_INGEST_TOKEN }}
+          ASSET: ${{ github.repository }}
+        run: python3 zap_to_aegis.py
       - name: Show app logs (on failure)
         if: failure()
         run: docker logs demo-app || true

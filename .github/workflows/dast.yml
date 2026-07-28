@@ -39,7 +39,7 @@ jobs:
           target: 'http://localhost:4567'
           fail_action: false
           allow_issue_writing: false
-          cmd_options: '-a -j -T 5 -J zap-report.json'
+          cmd_options: '-a -j -T 5'
           artifact_name: 'zap-report-ruby'
 
       - name: Send DAST findings to Aegis

@@ -2,6 +2,7 @@
 require "sinatra"
 require "json"
 require "securerandom"
+require "rack/auth/basic"
 
 set :bind, "0.0.0.0"
 set :port, (ENV["PORT"] || 4567).to_i
@@ -59,6 +60,37 @@ get "/api/items" do
     status 401
     { error: "unauthorized" }.to_json
   end
+end
+
+# ---------------------------------------------------------------------------
+# HTTP Basic realm. The session login above covers ZAP's `browser` and `form`
+# authentication; this is the only target in the demo estate for `http` auth,
+# which is scoped to a host and port rather than to a URL.
+# ---------------------------------------------------------------------------
+helpers do
+  def basic_authorized?
+    auth = Rack::Auth::Basic::Request.new(request.env)
+    return false unless auth.provided? && auth.basic? && auth.credentials
+    email, password = auth.credentials
+    USERS[email] == password
+  end
+end
+
+before "/basic/*" do
+  unless basic_authorized?
+    headers["WWW-Authenticate"] = 'Basic realm="aegis-demo"'
+    halt 401, { error: "unauthorized" }.to_json
+  end
+end
+
+get "/basic/items" do
+  content_type :json
+  { items: ITEMS }.to_json
+end
+
+get "/basic/profile" do
+  content_type :json
+  { email: Rack::Auth::Basic::Request.new(request.env).credentials.first }.to_json
 end
 
 get "/healthz" do

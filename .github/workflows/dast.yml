@@ -34,7 +34,7 @@ jobs:
       - name: Run ZAP authenticated scan
         run: |
           set +e
-          docker run --network host -u root -v ${{ github.workspace }}:/zap/wrk/:rw -e DAST_TARGET_URL -e DAST_USERNAME -e DAST_PASSWORD -e JAVA_OPTS=-Xmx2g ghcr.io/zaproxy/zaproxy:stable zap.sh -cmd -port 8090 -autorun /zap/wrk/.zap/plan.yaml
+          docker run --network host -u root -v ${{ github.workspace }}:/zap/wrk/:rw -v ${{ github.workspace }}/zaphome:/root/.ZAP:rw -e DAST_TARGET_URL -e DAST_USERNAME -e DAST_PASSWORD -e JAVA_OPTS=-Xmx2g ghcr.io/zaproxy/zaproxy:stable zap.sh -cmd -port 8090 -autorun /zap/wrk/.zap/plan.yaml
           zap_status=$?
           set -e
           # ZAP exits 2 when the plan completed and rules raised warnings --
@@ -49,6 +49,11 @@ jobs:
         env:
           DAST_USERNAME: ${{ secrets.DAST_USERNAME }}
           DAST_PASSWORD: ${{ secrets.DAST_PASSWORD }}
+      - name: ZAP internal log
+        if: always()
+        run: |
+          sudo tail -60 zaphome/zap.log 2>/dev/null \
+            || echo 'no zap.log produced'
       - name: Application logs
         if: always()
         run: docker logs demo-app 2>&1 | tail -40 || true

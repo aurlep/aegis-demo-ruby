@@ -20,9 +20,7 @@ env:
           loginRequestUrl: ${DAST_TARGET_URL}/login
           loginRequestBody: email={%username%}&password={%password%}
         verification:
-          method: poll
-          pollFrequency: 60
-          pollUnits: requests
+          method: response
           loggedInRegex: Sign out
       sessionManagement:
         method: cookie

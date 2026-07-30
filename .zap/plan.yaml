@@ -11,6 +11,7 @@ env:
     - name: app
       urls:
         - ${DAST_TARGET_URL}
+        - ${DAST_TARGET_URL}/dashboard
       includePaths:
         - ${DAST_TARGET_URL}.*
       authentication:

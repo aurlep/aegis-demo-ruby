@@ -50,6 +50,8 @@ jobs:
       context: app
       user: recorded-user
       maxRuleDurationInMins: 3
+      threadPerHost: 2
+      maxScanDurationInMins: 5
   - type: report
     parameters:
       template: sarif-json

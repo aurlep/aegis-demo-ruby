@@ -32,7 +32,7 @@ env:
             username: ${DAST_USERNAME}
             password: ${DAST_PASSWORD}
   parameters:
-    failOnError: false
+    failOnError: true
     progressToStdout: true
 jobs:
   - type: spider

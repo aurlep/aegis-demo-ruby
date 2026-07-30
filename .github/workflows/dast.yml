@@ -24,9 +24,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Start the application
         if: env.DAST_TARGET_REMOTE != 'true'
-        run: 'echo ''EDIT: start your app so it listens on $DAST_TARGET_URL'';
-
-          docker compose up -d --wait || true'
+        run: |
+          docker build -t demo-app:dast .
+          docker run -d --rm --name demo-app -p 4567:4567 demo-app:dast
+      - name: Show application logs if it never came up
+        if: failure()
+        run: docker logs demo-app || true
       - name: Wait for the target
         run: "timeout 90 bash -c \"until curl -sfk \\\"$DAST_TARGET_URL\\\" >/dev/null;\
           \ do sleep 3; done\" || {\n  echo \"::error::$DAST_TARGET_URL never answered;\

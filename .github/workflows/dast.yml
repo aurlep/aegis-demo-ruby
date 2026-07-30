@@ -27,22 +27,22 @@ jobs:
         run: |
           docker build -t demo-app:dast .
           docker run -d --rm --name demo-app -p 4567:4567 demo-app:dast
-      - name: Show application logs if it never came up
-        if: failure()
-        run: docker logs demo-app || true
       - name: Wait for the target
         run: "timeout 90 bash -c \"until curl -sfk \\\"$DAST_TARGET_URL\\\" >/dev/null;\
           \ do sleep 3; done\" || {\n  echo \"::error::$DAST_TARGET_URL never answered;\
           \ not running a scan that would report nothing.\"; exit 1;\n}"
       - name: Run ZAP authenticated scan
         run: 'docker run --network host -u root -v ${{ github.workspace }}:/zap/wrk/:rw
-          -e DAST_TARGET_URL -e DAST_USERNAME -e DAST_PASSWORD ghcr.io/zaproxy/zaproxy:stable
+          -e DAST_TARGET_URL -e DAST_USERNAME -e DAST_PASSWORD -e JAVA_OPTS=-Xmx2g ghcr.io/zaproxy/zaproxy:stable
           zap.sh -cmd -port 8090 -autorun /zap/wrk/.zap/plan.yaml
 
           mv results.sarif.json results.sarif 2>/dev/null || true'
         env:
           DAST_USERNAME: ${{ secrets.DAST_USERNAME }}
           DAST_PASSWORD: ${{ secrets.DAST_PASSWORD }}
+      - name: Application logs
+        if: always()
+        run: docker logs demo-app 2>&1 | tail -40 || true
       - name: Send findings to Aegis
         if: always()
         run: "report=\"results.sarif\"\nif [ ! -s \"$report\" ]; then\n  echo \"::warning\

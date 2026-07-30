@@ -32,11 +32,20 @@ jobs:
           \ do sleep 3; done\" || {\n  echo \"::error::$DAST_TARGET_URL never answered;\
           \ not running a scan that would report nothing.\"; exit 1;\n}"
       - name: Run ZAP authenticated scan
-        run: 'docker run --network host -u root -v ${{ github.workspace }}:/zap/wrk/:rw
-          -e DAST_TARGET_URL -e DAST_USERNAME -e DAST_PASSWORD -e JAVA_OPTS=-Xmx2g ghcr.io/zaproxy/zaproxy:stable
-          zap.sh -cmd -port 8090 -autorun /zap/wrk/.zap/plan.yaml
-
-          mv results.sarif.json results.sarif 2>/dev/null || true'
+        run: |
+          set +e
+          docker run --network host -u root -v ${{ github.workspace }}:/zap/wrk/:rw -e DAST_TARGET_URL -e DAST_USERNAME -e DAST_PASSWORD -e JAVA_OPTS=-Xmx2g ghcr.io/zaproxy/zaproxy:stable zap.sh -cmd -port 8090 -autorun /zap/wrk/.zap/plan.yaml
+          zap_status=$?
+          set -e
+          # ZAP exits 2 when the plan completed and rules raised warnings --
+          # the normal outcome of a scan that found something. The report is
+          # the deliverable, so judge the step on that, not on the exit code.
+          mv results.sarif.json results.sarif 2>/dev/null || true
+          if [ ! -s results.sarif ]; then
+            echo "::error::ZAP produced no report (exit $zap_status)"
+            exit 1
+          fi
+          echo "ZAP exited $zap_status; report written"
         env:
           DAST_USERNAME: ${{ secrets.DAST_USERNAME }}
           DAST_PASSWORD: ${{ secrets.DAST_PASSWORD }}

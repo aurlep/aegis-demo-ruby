@@ -3,9 +3,6 @@
 # and active-scans behind it. Credentials come from CI secrets, never this file.
 #
 # Recorded steps:
-#   1. fill input[name=email] ${DAST_USERNAME}
-#   2. fill input[name=password] ${DAST_PASSWORD}
-#   3. click button[type=submit]
 env:
   contexts:
     - name: app
@@ -22,7 +19,7 @@ env:
           loginRequestBody: email={%username%}&password={%password%}
         verification:
           method: response
-          loggedOutRegex: "<h1>Sign in</h1>"
+          loggedOutRegex: <h1>Sign in</h1>
       sessionManagement:
         method: cookie
       users:
@@ -37,18 +34,16 @@ jobs:
   - type: spider
     parameters:
       context: app
-      user: recorded-user
       maxDuration: 5
+      user: recorded-user
   - type: passiveScan-wait
     parameters:
       maxDuration: 5
   - type: activeScan
     parameters:
       context: app
-      user: recorded-user
       maxRuleDurationInMins: 3
-      threadPerHost: 2
-      maxScanDurationInMins: 5
+      user: recorded-user
   - type: report
     parameters:
       template: sarif-json
